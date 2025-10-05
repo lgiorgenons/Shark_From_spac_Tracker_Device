@@ -1,53 +1,63 @@
 # B-AMPT: Bio-Acoustic Motion and Profiling Tag
 
+*Versão 2.0 - Modelo Conceitual*
+
 ## 1. Resumo
 
-A B-AMPT (Tag de Bio-Acústica, Movimento e Perfilamento) é um dispositivo de biologging não invasivo projetado para ser acoplado a grandes espécies marinhas, como tubarões. O objetivo principal da tag é identificar e registrar eventos de alimentação em tempo real através de uma metodologia de fusão de sensores, combinando dados acústicos, de movimento e ambientais. Os dados coletados servem como "verdade de campo" para validar e aprimorar modelos de previsão de habitat baseados em dados de satélite.
+A B-AMPT (Tag de Bio-Acústica, Movimento e Perfilamento) é um dispositivo de biologging conceitual, não invasivo, projetado para ser acoplado a grandes espécies marinhas. O objetivo da tag é identificar e transmitir dados sobre eventos de alimentação em tempo real. A metodologia se baseia na fusão de dados de múltiplos sensores para validar um evento, focando na detecção de uma assinatura acústica seguida por um período de baixa atividade motora, inferindo um ciclo de caça e saciedade.
 
 ---
 
-## 2. Componentes de Hardware
+## 2. Componentes de Hardware (Conceitual)
 
-A tag integra um conjunto de sensores de baixo consumo para construir um perfil comportamental completo do animal.
+-   **Hidrofone de Alta Sensibilidade:** O sensor primário para capturar o áudio do ambiente, essencial para a detecção da assinatura acústica da alimentação.
 
--   **Hidrofone de Alta Sensibilidade:** O sensor primário, responsável por capturar um amplo espectro de sons do ambiente subaquático. É o componente chave para a detecção da assinatura acústica de um evento de alimentação.
+-   **Acelerômetro de 3 Eixos:** Com uma nova função estratégica, este sensor monitora os níveis de atividade do tubarão. Sua principal finalidade no conceito atual é **detectar períodos de baixa atividade (movimento lento e estável)**, que, ocorrendo após um evento acústico, podem inferir um estado de saciedade e digestão.
 
--   **Acelerômetro de 3 Eixos:** Mede a aceleração dinâmica e a orientação estática do animal. É fundamental para identificar padrões de movimento bruscos, como ataques, mordidas e arrancadas, que são característicos da alimentação.
+-   **Sensor de Temperatura e Pressão:** Coleta dados ambientais essenciais (temperatura da água e profundidade) para contextualizar o comportamento de caça e validar os modelos de previsão de habitat.
 
--   **Sensor de Temperatura e Pressão:** Coleta dados contextuais do ambiente. O sensor de pressão é usado para determinar a profundidade, enquanto o de temperatura registra as condições da coluna de água. Juntos, eles ajudam a construir um perfil do habitat onde a alimentação ocorre.
+-   **Unidade de Microprocessamento (MCU):** O cérebro da tag. A arquitetura é baseada em um MCU de baixíssimo consumo da **linha NXP MCX**. Estes processadores são ideais por seu baixo gasto energético em modo de espera e poder de processamento suficiente para executar os algoritmos de FFT e correlação em "bursts" quando um som candidato é detectado.
 
--   **Unidade de Microprocessamento (MCU):** O "cérebro" da tag. Um microcontrolador de baixo consumo responsável por executar o algoritmo de detecção, gerenciar a coleta de dados e controlar o estado dos sensores para economizar energia.
+-   **Módulo de Comunicação (Modem Ultrassônico):** Responsável pela transmissão de dados debaixo d'água. A comunicação via rádio (como LoRa) é ineficaz na água salgada, tornando o ultrassom a escolha ideal.
 
--   **Módulo de Armazenamento:** Uma memória flash não volátil para armazenar os dados dos eventos detectados para recuperação posterior.
-
--   **Bateria e Gerenciamento de Energia:** Fonte de alimentação otimizada para missões de longa duração, com um sistema que coloca os sensores em estado de baixo consumo quando nenhum evento de interesse está ocorrendo.
+-   **Bateria e Gerenciamento de Energia:** Fonte de energia de longa duração, provavelmente baseada em células de Lítio-Tion, com um sistema de gerenciamento avançado que mantém a tag em estado de "sono profundo" a maior parte do tempo.
 
 ---
 
-## 3. Metodologia de Detecção e Algoritmo
+## 3. Metodologia de Detecção (Fluxo Lógico)
 
-A detecção de um evento de alimentação é um processo de múltiplos estágios projetado para maximizar a precisão e minimizar falsos positivos. O algoritmo é baseado no protótipo desenvolvido (`run_correlation_analysis.py`).
-
-#### Estágio 1: Análise Acústica e Filtragem
--   O áudio capturado pelo hidrofone é continuamente analisado.
--   Um **filtro passa-banda digital**, baseado na análise de frequência (FFT/PSD) de assinaturas de alimentação conhecidas, é aplicado para isolar a faixa de frequência mais relevante (ex: 43 Hz - 1464 Hz, como determinado em nossos testes).
-
-#### Estágio 2: Detecção de Padrão por Correlação Cruzada
--   Este é o núcleo da detecção acústica. O script utiliza um algoritmo de **Correlação Cruzada** (`np.correlate`) para comparar o áudio filtrado com um padrão de assinatura pré-carregado na memória da tag.
--   Este método se provou mais robusto que a simples detecção de picos de energia, pois ele busca a "forma de onda" ou o padrão temporal exato do som, sendo eficaz mesmo para eventos sutis.
--   Quando a correlação ultrapassa um limiar pré-definido (ex: 65%), um "evento acústico candidato" é registrado.
-
-#### Estágio 3: Análise de Movimento
--   Paralelamente, o MCU monitora os dados do acelerômetro.
--   O algoritmo é treinado para reconhecer "padrões de movimento" associados à alimentação, como um pico súbito de aceleração ou uma mudança brusca de orientação.
-
-#### Estágio 4: Fusão de Sensores e Validação do Evento
--   A etapa final para confirmar uma alimentação. Um evento só é validado e registrado como "alimentação de alta confiança" se:
-    > **Evento Acústico Candidato** (do Estágio 2) + **Padrão de Movimento Compatível** (do Estágio 3) ocorrem dentro da mesma janela de tempo.
--   Quando um evento é validado, a tag registra o som, os dados de movimento e os dados ambientais (temperatura e profundidade) daquele momento.
+1.  **Modo de Escuta:** A tag opera em um modo de baixíssimo consumo, com o hidrofone amostrando o áudio em intervalos ou de forma contínua com um limiar de energia muito baixo.
+2.  **Ativação por Som:** Ao detectar um som que ultrapassa um limiar de energia na faixa de frequência de interesse (ex: 43-1464 Hz), o MCU é "acordado" e inicia a análise completa.
+3.  **Detecção por Correlação:** O algoritmo principal (`run_correlation_analysis.py`) é executado no trecho de áudio capturado, buscando o padrão da assinatura de alimentação pré-carregada.
+4.  **Confirmação pelo Movimento:** Se uma correspondência acústica é encontrada, o MCU começa a monitorar intensivamente os dados do acelerômetro. Se, nos minutos seguintes à detecção acústica, for registrado um período de **baixa atividade motora** (indicando um possível estado de repouso/digestão), o evento é validado como "Ciclo de Alimentação Concluído".
+5.  **Transmissão de Dados:** Um pacote de dados consolidado é transmitido via ultrassom.
 
 ---
 
-## 4. Fluxo de Dados e Otimização de Energia
+## 4. Arquitetura de Comunicação
 
-Para maximizar a vida útil da bateria, a tag opera em um modo de "escuta" de baixo consumo. A análise completa de correlação e movimento só é ativada quando um pico de energia preliminar no áudio ou um movimento anômalo é detectado. Apenas os eventos de alimentação validados são armazenados em detalhe, economizando espaço de memória e energia.
+A comunicação é projetada em duas etapas para superar as limitações do ambiente marinho.
+
+-   **Etapa 1: Tag para Receptor (Ultrassom)**
+    -   **Tecnologia:** A tag utiliza um modem acústico que converte pacotes de dados digitais em pulsos de som de alta frequência (ultrassom).
+    -   **Velocidade e Dados:** A comunicação acústica subaquática tem baixa largura de banda. As velocidades típicas variam de **100 a 2000 bits por segundo (aproximadamente 12 a 250 bytes/s)**. Devido a essa limitação, a tag não transmite o áudio bruto, mas sim um **pacote de dados compacto** contendo:
+        -   ID da Tag
+        -   Timestamp do Evento
+        -   Tipo de Evento (ex: Alimentação Confirmada)
+        -   Nível de Confiança da Detecção (ex: 85%)
+        -   Profundidade e Temperatura no momento do evento.
+    -   **Alcance:** O alcance efetivo pode variar de centenas de metros a alguns quilômetros, dependendo da frequência, potência e condições da água (ruído, temperatura, salinidade).
+
+-   **Etapa 2: Receptor para Satélite**
+    -   **Conceito:** Receptores acústicos autônomos (boias ou unidades ancoradas no fundo do mar) são posicionados em "hotspots" conhecidos de tubarões.
+    -   **Função:** Essas unidades "escutam" os sinais ultrassônicos das tags. Ao receber um pacote de dados, o receptor utiliza seu próprio transmissor de satélite (ex: Iridium, Argos) para retransmitir a informação quase em tempo real para os centros de pesquisa.
+
+---
+
+## 5. Design Físico e Materiais (Conceitual)
+
+-   **Invólucro (Enclosure):** Para suportar a extrema pressão em grandes profundidades, o invólucro é o componente mais crítico. Ele seria construído em **Titânio Grau 5** ou **Cerâmica de Alumina**, materiais conhecidos por sua altíssima resistência à compressão e corrosão. O design seria hidrodinâmico para minimizar o arrasto e o impacto no comportamento do animal.
+
+-   **Proteção Interna:** Todos os componentes eletrônicos, incluindo a **bateria e a placa do MCU**, seriam encapsulados em uma **resina epóxi ou poliuretano** de grau marinho. Este processo, chamado de "potting", preenche todo o espaço vazio, tornando o interior um bloco sólido. Isso impede que os componentes se deformem ou que as soldas se quebrem sob a flexão do invólucro em alta pressão, respondendo à sua dúvida sobre a segurança da bateria e da placa.
+
+-   **Acoplamento:** A tag seria acoplada à barbatana dorsal do tubarão usando um método comprovado e seguro, projetado para se soltar após um período pré-determinado para permitir a recuperação do dispositivo ou minimizar o impacto a longo prazo no animal.
